@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Folder, Upload, ChevronRight, ChevronDown, Settings, Search, BarChart } from 'lucide-react';
+import { Folder, File, Upload, ChevronRight, ChevronDown, Settings, Search, BarChart } from 'lucide-react';
 import { parse } from 'papaparse';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
+// モックデータベース操作
 const mockDatabase = {
     directories: [
         { id: 1, name: '新規材料開発プロジェクト', parentId: null },
@@ -44,6 +45,9 @@ const IntegratedExperimentManager = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [searchResults, setSearchResults] = useState([]);
 
+    // structureタブの表示状態を管理する状態変数
+    const [showStructure, setShowStructure] = useState(true);
+
     const fileInputRef = useRef(null);
     const dropZoneRef = useRef(null);
 
@@ -70,7 +74,7 @@ const IntegratedExperimentManager = () => {
 
     useEffect(() => {
         const dropZone = dropZoneRef.current;
-        if (dropZone) {
+        if (dropZone && activeTab === 'structure') {
             const handleDragOver = (e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -96,7 +100,7 @@ const IntegratedExperimentManager = () => {
                 dropZone.removeEventListener('drop', handleDrop);
             };
         }
-    }, [currentDirectory]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [currentDirectory, activeTab]);
 
     const mergeFileContents = (dirFiles) => {
         let mergedData = [];
@@ -176,6 +180,7 @@ const IntegratedExperimentManager = () => {
             return newSet;
         });
     };
+
     const renderDirectories = (parentId = null, depth = 0) => {
         return directories
             .filter(dir => dir.parentId === parentId)
@@ -263,14 +268,71 @@ const IntegratedExperimentManager = () => {
         switch (activeTab) {
             case 'structure':
                 return (
-                    <div>
-                        <h2 className="text-lg font-semibold mb-4">プロジェクト構造</h2>
-                        {renderDirectories()}
+                    <div className="p-8">
+                        {showStructure && ( // showStructureがtrueの場合のみ表示
+                            <>
+                                <h2 className="text-2xl font-semibold mb-4">
+                                    {currentDirectory ? currentDirectory.name : 'プロジェクト概要'}
+                                </h2>
+                                {currentDirectory && ( // currentDirectoryがtruthy（null以外）のときのみ表示
+                                    <div
+                                        ref={dropZoneRef}
+                                        className={`border-2 border-dashed rounded-lg p-8 mb-4 ${isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
+                                            }`}
+                                    >
+                                        {isDragging ? (
+                                            <div className="text-center">
+                                                <Upload size={48} className="mx-auto text-blue-500 mb-4" />
+                                                <p className="text-blue-500">ファイルをドロップしてアップロード</p>
+                                            </div>
+                                        ) : (
+                                            <div className="text-center">
+                                                <Upload size={48} className="mx-auto text-gray-400 mb-4" />
+                                                <p className="text-gray-500 mb-2">ここにCSVファイルをドラッグ＆ドロップ</p>
+                                                <p className="text-gray-400">または</p>
+                                                <label className="mt-2 inline-block cursor-pointer bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                                                    ファイルを選択
+                                                    <input
+                                                        type="file"
+                                                        accept=".csv"
+                                                        className="hidden"
+                                                        onChange={(e) => handleFileUpload(e.target.files[0])}
+                                                        ref={fileInputRef}
+                                                    />
+                                                </label>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                                <div className="overflow-x-auto bg-white rounded-lg shadow">
+                                    <table className="w-full">
+                                        <thead>
+                                            <tr className="bg-gray-100">
+                                                {columns.map((column, index) => (
+                                                    <th key={index} className="px-4 py-2 text-left text-gray-600">{column}</th>
+                                                ))}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {spreadsheetData.map((row, rowIndex) => (
+                                                <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-gray-50' : ''}>
+                                                    {columns.map((column, colIndex) => (
+                                                        <td key={colIndex} className="px-4 py-2 border-t">
+                                                            {row[column] || ''}
+                                                        </td>
+                                                    ))}
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </>
+                        )}
                     </div>
                 );
             case 'search':
                 return (
-                    <div>
+                    <div className="p-8">
                         <h2 className="text-lg font-semibold mb-4">検索</h2>
                         <div className="flex mb-4">
                             <input
@@ -292,7 +354,7 @@ const IntegratedExperimentManager = () => {
                 );
             case 'settings':
                 return (
-                    <div>
+                    <div className="p-8">
                         <h2 className="text-lg font-semibold mb-4">設定</h2>
                         <div className="space-y-4">
                             <div>
@@ -324,7 +386,7 @@ const IntegratedExperimentManager = () => {
                 );
             case 'analytics':
                 return (
-                    <div>
+                    <div className="p-8">
                         <h2 className="text-lg font-semibold mb-4">分析ダッシュボード</h2>
                         <ResponsiveContainer width="100%" height={300}>
                             <LineChart data={analyticsData}>
@@ -346,20 +408,33 @@ const IntegratedExperimentManager = () => {
     };
 
     return (
-        <div className="flex h-screen bg-gray-100">
-            <div className="w-64 bg-white shadow-lg">
+        <div className="flex h-screen bg-gray-100 overflow-hidden">
+            <div className="w-64 bg-white shadow-lg overflow-y-auto">
                 <div className="p-4">
                     <h1 className="text-xl font-bold text-center mb-6">実験管理システム</h1>
                 </div>
                 <nav className="mt-6">
-                    {['structure', 'search', 'settings', 'analytics'].map((tab) => (
+                    {/* Structureタブのボタン */}
+                    <button
+                        key="structure"
+                        onClick={() => { setActiveTab('structure'); setShowStructure(true); }}
+                        className={`flex items-center w-full px-4 py-2 ${activeTab === 'structure' ? 'bg-blue-500 text-white' : 'text-gray-600 hover:bg-gray-200'
+                            }`}
+                    >
+                        <Folder size={20} className="mr-2" />
+                        <span className="capitalize">Structure</span>
+                    </button>
+                    {/* Structureボタン直下にディレクトリ構成を表示 */}
+                    {activeTab === 'structure' && showStructure && renderDirectories()}
+                    {/* 区切り線 */}
+                    <hr className="my-4" />
+                    {['search', 'settings', 'analytics'].map((tab) => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
                             className={`flex items-center w-full px-4 py-2 ${activeTab === tab ? 'bg-blue-500 text-white' : 'text-gray-600 hover:bg-gray-200'
                                 }`}
                         >
-                            {tab === 'structure' && <Folder size={20} className="mr-2" />}
                             {tab === 'search' && <Search size={20} className="mr-2" />}
                             {tab === 'settings' && <Settings size={20} className="mr-2" />}
                             {tab === 'analytics' && <BarChart size={20} className="mr-2" />}
@@ -368,60 +443,8 @@ const IntegratedExperimentManager = () => {
                     ))}
                 </nav>
             </div>
-            <div className="flex-1 overflow-hidden">
-                <div className="h-full p-8">
-                    {renderContent()}
-                    <div
-                        ref={dropZoneRef}
-                        className={`border-2 border-dashed rounded-lg p-8 mb-4 ${isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
-                            }`}
-                    >
-                        {isDragging ? (
-                            <div className="text-center">
-                                <Upload size={48} className="mx-auto text-blue-500 mb-4" />
-                                <p className="text-blue-500">ファイルをドロップしてアップロード</p>
-                            </div>
-                        ) : (
-                            <div className="text-center">
-                                <Upload size={48} className="mx-auto text-gray-400 mb-4" />
-                                <p className="text-gray-500 mb-2">ここにCSVファイルをドラッグ＆ドロップ</p>
-                                <p className="text-gray-400">または</p>
-                                <label className="mt-2 inline-block cursor-pointer bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
-                                    ファイルを選択
-                                    <input
-                                        type="file"
-                                        accept=".csv"
-                                        className="hidden"
-                                        onChange={(e) => handleFileUpload(e.target.files[0])}
-                                        ref={fileInputRef}
-                                    />
-                                </label>
-                            </div>
-                        )}
-                    </div>
-                    <div className="overflow-x-auto bg-white rounded-lg shadow">
-                        <table className="w-full">
-                            <thead>
-                                <tr className="bg-gray-100">
-                                    {columns.map((column, index) => (
-                                        <th key={index} className="px-4 py-2 text-left text-gray-600">{column}</th>
-                                    ))}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {spreadsheetData.map((row, rowIndex) => (
-                                    <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-gray-50' : ''}>
-                                        {columns.map((column, colIndex) => (
-                                            <td key={colIndex} className="px-4 py-2 border-t">
-                                                {row[column] || ''}
-                                            </td>
-                                        ))}
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+            <div className="flex-1 overflow-y-auto">
+                {renderContent()}
             </div>
             {renderContextMenu()}
         </div>
