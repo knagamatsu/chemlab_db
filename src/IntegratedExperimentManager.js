@@ -411,7 +411,7 @@ const IntegratedExperimentManager = () => {
         <div className="flex h-screen bg-gray-100 overflow-hidden">
             <div className="w-64 bg-white shadow-lg overflow-y-auto">
                 <div className="p-4">
-                    <h1 className="text-xl font-bold text-center mb-6">実験管理システム</h1>
+                    <h1 className="text-xl font-bold text-center mb-6">ChemLab DB</h1>
                 </div>
                 <nav className="mt-6">
                     {/* Structureタブのボタン */}
